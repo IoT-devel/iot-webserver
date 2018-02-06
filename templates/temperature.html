@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Title</title>
+        <script src="{{ url_for('static', filename='js/echarts.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/jquery-1.11.0.min.js') }}"></script>
+        <script src="{{ url_for('static', filename='js/jquery-ui.min.js') }}"></script>
+        <script type="text/javascript">
+            // jquery.thermometer.js code START
+            /* global jQuery */
+            (function($) {
+                var Thermometer = {
+
+                    /**
+                     *  Set the value to show in the thermometer. If the value
+                     *  is outside the maxmimum or minimum range it shall be clipped.
+                     */
+                    setValue: function( value ) {
+                        if( value >= this.options.maxValue ) {
+                            this.valueToAttain = this.options.maxValue;
+                        } else if( value <= this.options.minValue ) {
+                            this.valueToAttain = this.options.minValue;
+                        } else {
+                            this.valueToAttain = value;
+                        }
+
+                        this._update();
+                    },
+
+                    /**
+                     * Set the text colour
+                     */
+                    setTextColour: function( newColour ) {
+                        this._updateTextColour( newColour );
+                    },
+
+                    /**
+                     * Set the tick colour
+                     */
+                    setTickColour: function( newColour ) {
+                        this._updateTickColour( newColour );
+                    },
+
+                    /**
+                     * Set the text at the top of the scale
+                     */
+                    setTopText: function( newText ) {
+                        this.topText.find('tspan').text(newText);
+                    },
+
+                    /**
+                     * Set the text at the bottom of the scale
+                     */
+                    setBottomText: function( newText ) {
+                        this.bottomText.find('tspan').text(newText);
+                    },
+
+                    /**
+                     * Set the colour of the liquid in the thermometer. This must
+                     * be of the form #ffffff. The shortened form and the rgb() form
+                     * are not supported.
+                     */
+                    setLiquidColour: function( newColour ) {
+
+                        this.options.liquidColour = newColour;
+                        this._updateLiquidColour();
+                    },
+
+                    /**
+                     * Returns the liquid colour. If this is controlled by a colour
+                     * function, then it returns the colour for the current value.
+                     */
+                    getLiquidColour: function() {
+                        if( $.isFunction( this.options.liquidColour ) ) {
+                            return this.options.liquidColour( this.currentValue );
+                        } else {
+                            return this.options.liquidColour;
+                        }
+                    },
+
+                    _updateLiquidColour: function() {
+                        var liquidColour = this.getLiquidColour();
+
+                        var variables = [];
+                        variables["colour"] = liquidColour;
+                        variables["darkColour"] = this._blendColors( liquidColour, "#000000", 0.1 );
+                        variables["veryDarkColour"] = this._blendColors( liquidColour, '#000000', 0.2 );
+
+                        this._formatDataAttribute( this.neckLiquid, "style", variables );
+                        this._formatDataAttribute( this.liquidTop, "style", variables );
+                        this._formatDataAttribute( this.bowlLiquid, "style", variables );
+                        this._formatDataAttribute( this.bowlGlass, "style", variables );
+                        this._formatDataAttribute( this.neckGlass, "style", variables );
+                    },
+
+                    _updateTextColour: function( newColour ) {
+                        this.options.textColour = newColour;
+                        var variables = { textColour: this.options.textColour };
+                        this._formatDataAttribute( this.topText, "style", variables );
+                        this._formatDataAttribute( this.bottomText, "style", variables );
+                    },
+
+                    _updateTickColour: function( newColour ) {
+                        this.options.tickColour = newColour;
+                        var variables = { tickColour: this.options.tickColour };
+                        var self = this;
+                        this.ticks.find('rect').each( function(indx,tick) {
+                            self._formatDataAttribute( tick, "style", variables );
+                        } );
+                    },
+
+                    _setupSVGLinks: function(svg) {
+                        // Replace all ids in the SVG with fixtureId_id
+                        var id = this.fixtureId;
+                        svg.find('g[id], g [id]').each( function(indx,obj) {
+                            $(obj).attr('id', id + "_" + $(obj).attr('id') );
+                        });
+
+                        // This is all a bit magic, but these numbers come
+                        // from the SVG itself and so this will only work with
+                        // a specific SVG file.
+                        this.liquidBottomY = 346;
+                        this.liquidTopY = 25;
+                        this.neckBottomY = 573;
+                        this.neckTopY = 250;
+                        this.neckMinSize = 30;
+                        this.svgHeight = 1052;
+                        this.leftOffset = 300;
+                        this.topOffset = 150;
+                        this.liquidTop = $('#'+id+'_LiquidTop path');
+                        this.neckLiquid = $('#'+id+'_NeckLiquid path');
+                        this.bowlLiquid = $('#'+id+'_BowlLiquid path');
+                        this.topText = $('#'+id+'_TopText');
+                        this.bottomText = $('#'+id+'_BottomText');
+                        this.bowlGlass = $('#'+id+'_BowlGlass');
+                        this.neckGlass = $('#'+id+'_NeckGlass');
+                        this.ticks = $('#'+id+'_Ticks');
+                    },
+
+                    _create: function() {
+                        var self = this;
+                        var div = $('<div/>');
+                        this.div = div;
+                        this.element.append( div );
+                        this.fixtureId = this.element.attr('id');
+
+                        div.load( this.options.pathToSVG, null, function() {
+                            // Scale the SVG to the options provided.
+                            var svg = $(this).find("svg");
+                            self._setupSVGLinks(svg);
+
+                            svg[0].setAttribute( "preserveAspectRatio", "xMinYMin meet" );
+                            svg[0].setAttribute( "viewBox", self.leftOffset+" "+self.topOffset+" 744 600" );
+
+                            svg.attr("width",  self.options.width );
+                            svg.attr("height", self.options.height );
+
+                            // Setup the SVG to the given options
+                            self.currentValue = self.options.startValue;
+                            self.setValue( self.options.startValue );
+                            self.setTopText( self.options.topText );
+                            self.setBottomText( self.options.bottomText );
+                            self.setLiquidColour( self.options.liquidColour );
+                            self.setTextColour( self.options.textColour );
+                            self.setTickColour( self.options.tickColour );
+
+                            if( self.options.onLoad ) {
+                                self.options.onLoad();
+                            }
+                        } );
+                    },
+
+                    _update: function() {
+                        var self = this;
+                        var valueProperty = {val: this.currentValue};
+                        $(valueProperty).animate( {val: this.valueToAttain}, {
+                            duration: this.options.animationSpeed,
+                            step: function() {
+                                self._updateViewToValue( this.val );
+                                self.currentValue = this.val;
+                            }
+                        } );
+                    },
+
+                    _updateViewToValue: function( value ) {
+
+                        // Allow the liquid colour to be controlled by a function based on value
+                        if( $.isFunction( this.options.liquidColour ) ) {
+                            this._updateLiquidColour();
+                        }
+
+
+                        var variables = [];
+                        variables["liquidY"] = this.liquidBottomY - (value - this.options.minValue) * (this.liquidBottomY - this.liquidTopY) / (this.options.maxValue - this.options.minValue);
+                        variables["neckPosition"] = (value - this.options.minValue) * (this.neckBottomY - this.neckTopY) / (this.options.maxValue - this.options.minValue) + this.neckMinSize;
+                        variables["boxPosition"] = this.neckBottomY - variables["neckPosition"];
+
+                        // Move the oval representing the top of the liquid
+                        this._formatDataAttribute( this.liquidTop, "transform", variables );
+
+                        // Stretch the box representing the liquid in the neck
+                        this._formatDataAttribute( this.neckLiquid, "d", variables );
+
+                        // Call the valueChanged callback.
+                        if( this.options.valueChanged ) {
+                            this.options.valueChanged( value );
+                        }
+                    },
+
+                    _formatDataAttribute: function( object, attribute, variables ) {
+                        var formatString = $(object).attr("data-"+attribute);
+                        for( var v in variables ) {
+                            formatString = formatString.replace( new RegExp("%%"+v+"%%", "g"), variables[v] );
+                        }
+                        $(object).attr(attribute,formatString);
+                    },
+
+                    // http://stackoverflow.com/questions/5560248/programmatically-lighten-or-darken-a-hex-color-or-rgb-and-blend-colors
+                    _blendColors: function(c0, c1, p) {
+                        var f=parseInt(c0.slice(1),16),t=parseInt(c1.slice(1),16),R1=f>>16,G1=f>>8&0x00FF,B1=f&0x0000FF,R2=t>>16,G2=t>>8&0x00FF,B2=t&0x0000FF;
+                        return "#"+(0x1000000+(Math.round((R2-R1)*p)+R1)*0x10000+(Math.round((G2-G1)*p)+G1)*0x100+(Math.round((B2-B1)*p)+B1)).toString(16).slice(1);
+                    },
+
+
+                    // Default options
+                    options: {
+                        height: 700,
+                        minValue: 0,
+                        maxValue: 8,
+                        startValue: 0,
+                        topText: 8,
+                        bottomText: 0,
+                        textColour: '#000000',
+                        tickColour: '#000000',
+                        liquidColour: "#ff0000",
+                        animationSpeed: 1000,
+                        pathToSVG: "{{ url_for('static', filename='svg/thermo-bottom.svg') }}",
+                        valueChanged: undefined,
+                        onLoad: undefined
+                    }
+                };
+
+                $.widget( "dd.thermometer", Thermometer );
+
+            })(jQuery);
+            // jquery.thermometer.js code END
+
+            $(document).ready( function() {
+                function blendColors(c0, c1, p) {
+                    var f=parseInt(c0.slice(1),16),t=parseInt(c1.slice(1),16),R1=f>>16,G1=f>>8&0x00FF,B1=f&0x0000FF,R2=t>>16,G2=t>>8&0x00FF,B2=t&0x0000FF;
+                    return "#"+(0x1000000+(Math.round((R2-R1)*p)+R1)*0x10000+(Math.round((G2-G1)*p)+G1)*0x100+(Math.round((B2-B1)*p)+B1)).toString(16).slice(1);
+                }
+
+                var GColor = function(r,g,b) {
+                    r = (typeof r === 'undefined')?0:r;
+                    g = (typeof g === 'undefined')?0:g;
+                    b = (typeof b === 'undefined')?0:b;
+                    // return {r:r, g:g, b:b};
+                    return rgbToHex(r, g, b);
+                };
+                /*
+                var createColorRange = function(c1, c2) {
+                    var colorList = [], tmpColor;
+                    for (var i=0; i < 255; i++) {
+                        tmpColor = new GColor();
+                        tmpColor.r = parseInt(c1.r + ((i*(c2.r-c1.r))/255));
+                        tmpColor.g = parseInt(c1.g + ((i*(c2.g-c1.g))/255));
+                        tmpColor.b = parseInt(c1.b + ((i*(c2.b-c1.b))/255));
+                        colorList.push(tmpColor);
+                    }
+                    return colorList;
+                };
+                */
+
+                function componentToHex(c) {
+                    var hex = c.toString(16);
+                    return hex.length == 1 ? "0" + hex : hex;
+                }
+
+                /*
+                function rgbToHex(r, g, b) {
+                    return "#" + componentToHex(r) + componentToHex(g) + componentToHex(b);
+                }
+                */
+
+                function hexToRgb(hex) {
+                    var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                    return result ? {
+                        r: parseInt(result[1], 16),
+                        g: parseInt(result[2], 16),
+                        b: parseInt(result[3], 16)
+                    } : null;
+                }
+
+                $('#fixture').thermometer({
+                    startValue: 0,
+                    height: 700,
+                    width: "100%",
+                    bottomText: "Cold",
+                    topText: "Hot",
+                    animationSpeed: 300,
+                    maxValue: 50,
+                    minValue: 20,
+                    liquidColour: function( value ) {
+                        console.log('liquidColour');
+                        var alert_value = $('#alert_temp_value').val();
+                        if (alert_value && value >= alert_value) {
+                            return '#ec1515';
+                        } else {
+                            return '#4fa700';
+                        }
+                    },
+                    valueChanged: function(value) {
+                        $('#value').text(value.toFixed(1));
+                    }
+                });
+            });
+        </script>
+        <script src="{{ url_for('static', filename='js/jquery-3.1.1.min.js') }}"></script>
+        <script type="text/javascript">
+            var $jq = jQuery.noConflict(true);
+            $jq(function() {
+                function lightBulb(light) {
+                    if(light) {
+                        $('.light').css('backgroundPosition', '-53px');
+                    } else {
+                        $('.light').css('backgroundPosition', '0');
+                    }
+                }
+            });
+        </script>
+        <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='css/bootstrap.min.css') }}" />
+        <style type="text/css">
+            #value { width: 160px; text-align: center; }
+            .thermometer {
+                /* padding: 120px 0 0 100px; */
+            }
+
+            .line {
+                padding: 50px 40px 0 0;
+            }
+
+            .light {
+                width: 50px;
+                height: 100px;
+                position: fixed;
+                top: 10px;
+                right: 10px;
+                background: url('{{ url_for("static", filename="images/light.png") }}') no-repeat ;
+                background-size: 100px 100px;
+                background-repeat: no-repeat;
+                background-position: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <nav class="navbar navbar-default" style="background-color: #3F87FF; padding: 8px; height: 60px;">
+            <img src="{{ static('images/yungear.png') }}" style="height: 44px; "><a class="navbar-brand" href="#"></a></img>
+        </nav>
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-xs-12">
+                    <input type="text" id="alert_value" value="50">
+                    <input type="button" id="confirm" value="Reset" alt="Reset the alert value">
+                    <input type="hidden" id="alert_temp_value" value="50">
+                </div>
+
+            </div>
+            <div class="row">
+                <div class="col-xs-4 col-xs-6 thermometer">
+                    <h2 id="value"></h2>
+                    <div id="fixture"></div>
+                </div>
+                <div class="col-xs-8 col-xs-6 line">
+                    <div id="containers"></div>
+
+                    <div id="main" style="width: 900px;height:600px;"></div>
+                    <script type="application/javascript">
+                    $(function () {
+                        var REST_HOST = "";
+                        var COUNT = 150;
+                        console.log('Init');
+                        myChart = echarts.init(document.getElementById('main'));
+                        function curr_time() {
+                            var now = (new Date());
+                            var now_datetime = [now.getFullYear(), now.getMonth() + 1, now.getDate()].join('-')
+                                        + ' '
+                                        + [now.getHours(), now.getMinutes(), now.getSeconds()].join(':');
+                            return now_datetime;
+                        }
+
+                        function pointData(temperature, datetime) {
+                            // now = new Date(+now + oneDay);
+                            // value = value + Math.random() * 21 - 10;
+                            var now = (new Date());
+                            var now_datetime = [now.getFullYear(), now.getMonth() + 1, now.getDate()].join('-')
+                                        + ' '
+                                        + [now.getHours(), now.getMinutes(), now.getSeconds()].join(':');
+                            return {
+                                name: now_datetime,
+                                value: [
+                                    datetime
+                                    , temperature
+                                ]
+                            }
+                        }
+
+                        data = [];
+                        load_data_complete = false;
+                        option = {
+                            title: {
+                                text: 'temperature'
+                            },
+                            tooltip: {
+                                trigger: 'axis',
+                                formatter: function (params) {
+                                    params = params[0];
+                                    return params.value[0] + ' ( ' + params.value[1] + ' )';
+                                },
+                                axisPointer: {
+                                    animation: false
+                                }
+                            },
+                            xAxis: {
+                                name: 'time',
+                                type: 'time',
+                                splitLine: {
+                                    show: false
+                                },
+                                splitNumber: 10
+                            },
+                            yAxis: {
+                                type: 'value',
+                                boundaryGap: [0, '100%'],
+                                splitLine: {
+                                    show: true
+                                },
+                                max: 35,
+                                min: 15
+                            },
+                            series: [{
+                                name: 'Time',
+                                type: 'line',
+                                showSymbol: false,
+                                hoverAnimation: false,
+                                data: (function () {
+                                    console.log('load data');
+                                    $.ajax({
+                                        url: REST_HOST + '/rest/old_data?count=' + COUNT,
+                                        success: function (results) {
+                                            for (var i in results) {
+                                                data.push(pointData(
+                                                        results[i]['temperature'],
+                                                        results[i]['datetime']
+                                                ));
+                                            }
+                                        },
+                                        async: false
+                                    });
+                                    load_data_complete = true;
+                                    return data;
+                                })()
+                            }]
+                        };
+
+                        myChart.setOption(option);
+                        if (load_data_complete) {
+                        // if (false) {
+                            setInterval(function () {
+                                $.ajax({
+                                    url: REST_HOST + '/rest/new_data',
+                                    success: function (result) {
+                                        data.shift();
+                                        data.push(pointData(
+                                            result['temperature'],
+                                            result['datetime']
+                                        ));
+                                    },
+                                    async: false
+                                });
+
+                                $('#fixture').thermometer('setValue', data.slice(-1)[0]['value'][1]);
+                                myChart.setOption({
+                                    series: [{
+                                        data: data
+                                    }]
+                                });
+                            }, 6000);
+                        }
+
+                        $('#confirm').click(function () {
+                            var alert_temperature = $('#alert_value').val();
+                            $('#alert_temp_value').val(alert_temperature);
+                        });
+                    });
+                    </script>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
